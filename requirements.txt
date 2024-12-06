@@ -1,3 +1,4 @@
 astrapy
 python-dotenv
 streamlit
+tiktoken
