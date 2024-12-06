@@ -2,6 +2,9 @@ import streamlit as st
 from ai import run_flow
 from profiles import create_profile, get_notes, get_profile 
 from form_submit import update_personal_info, add_note, delete_note
+from uuid import uuid4
+import tiktoken
+
 
 st.title("Pathway Mapper")
 
@@ -207,10 +210,11 @@ def notes():
             st.session_state.notes.append(note)
             st.rerun()
 
+
 @st.fragment()
 def continuous_chat():
     """
-    Continuous chat feature that maintains chat history.
+    Continuous chat feature that maintains chat history with token counts using tiktoken.
     """
     st.header("AI Chat")
     
@@ -226,42 +230,80 @@ def continuous_chat():
         elif role == "ai":
             st.markdown(f"**AI:** {message}")
 
-    # Input for user's message
-    user_input = st.text_input("Your Message", key="chat_input")
-    if st.button("Send"):
-        if user_input:
-            # Append user's input to chat history
-            st.session_state.chat_history.append(("user", user_input))
-            
-            # Get AI's response
-            with st.spinner("Waiting for AI response..."):
-                try:
-                    ai_response = run_flow(st.session_state.profile, user_input)
-                    # Append AI's response to chat history
-                    st.session_state.chat_history.append(("ai", ai_response))
-                except Exception as e:
-                    st.error(f"Error: {e}")
-            # Refresh the chat dynamically
-            st.rerun()
+    # Chat form to handle input and submit via Enter
+    with st.form("chat_form", clear_on_submit=True):
+        user_input = st.text_input("Your Message", key="chat_input")
+        submit_button = st.form_submit_button("Send")
+    
+    # If the form is submitted
+    if submit_button and user_input:
+        # Append user's input to chat history
+        st.session_state.chat_history.append(("user", user_input))
+        
+        # Get AI's response
+        with st.spinner("Waiting for AI response..."):
+            try:
+                ai_response = run_flow(st.session_state.profile, user_input)
+                # Append AI's response to chat history
+                st.session_state.chat_history.append(("ai", ai_response))
+            except Exception as e:
+                st.error(f"Error: {e}")
+        # Automatically refresh the chat dynamically
+        st.rerun()
+
+    # Initialize tiktoken encoding for the specific model
+    encoding = tiktoken.encoding_for_model("gpt-4o-mini")
+
+    # Token count function using tiktoken
+    def calculate_token_count(message):
+        """
+        Calculates token count using tiktoken's encoding.
+        """
+        return len(encoding.encode(message))
+
+    # Generate chat history as text with token counts
+    chat_history_text = ""
+    user_tokens = 0
+    ai_tokens = 0
+
+    for role, message in st.session_state.chat_history:
+        token_count = calculate_token_count(message)
+        if role == "user":
+            user_tokens += token_count
+        elif role == "ai":
+            ai_tokens += token_count
+        chat_history_text += f"{role.upper()}: {message} (Tokens: {token_count})\n"
+
+    # Add total token counts at the end of the chat history
+    total_tokens = user_tokens + ai_tokens
+    chat_history_text += f"\n---\n"
+    chat_history_text += f"Total User Tokens: {user_tokens}\n"
+    chat_history_text += f"Total AI Tokens: {ai_tokens}\n"
+    chat_history_text += f"Total Tokens: {total_tokens}\n"
+
+    # Add a download button for chat history
+    st.download_button(
+        label="Download Chat History",
+        data=chat_history_text,
+        file_name="chat_history_with_token_counts.txt",
+        mime="text/plain",
+    )
+
+
 
 @st.fragment()
 def forms():
-    # Ensure profile_id is initialized
+    
+    
     if "profile_id" not in st.session_state:
-        profile_id = 2  # Default profile_id; replace with dynamic logic if needed
+        profile_id = str(uuid4())  # Generate a unique ID for each visitor
         try:
-            profile = get_profile(profile_id)
-            if profile:
-                # Profile already exists
-                st.session_state.profile_id = profile_id
-                st.session_state.profile = profile
-            else:
-                # Create a new profile
-                profile_id, profile = create_profile(profile_id)
-                st.session_state.profile_id = profile_id
-                st.session_state.profile = profile
+            # Create a new profile using the random ID
+            profile_id, profile = create_profile(profile_id)
+            st.session_state.profile_id = profile_id
+            st.session_state.profile = profile
         except Exception as e:
-            st.error(f"Error fetching or creating profile: {e}")
+            st.error(f"Error creating profile: {e}")
             return
 
     # Ensure completed_courses exists in profile

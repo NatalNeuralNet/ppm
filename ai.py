@@ -22,27 +22,6 @@ TWEAKS = {
     "TextOutput-3q8AU": {},
 }
 
-def dict_to_string(obj, level=0):
-    strings = []
-    indent = "  " * level  # Indentation for nested levels
-    
-    if isinstance(obj, dict):
-        for key, value in obj.items():
-            if isinstance(value, (dict, list)):
-                nested_string = dict_to_string(value, level + 1)
-                strings.append(f"{indent}{key}: {nested_string}")
-            else:
-                strings.append(f"{indent}{key}: {value}")
-    elif isinstance(obj, list):
-        for idx, item in enumerate(obj):
-            nested_string = dict_to_string(item, level + 1)
-            strings.append(f"{indent}Item {idx + 1}: {nested_string}")
-    else:
-        strings.append(f"{indent}{obj}")
-
-    return ", ".join(strings)
-
-
 def run_flow(profile_data: dict, question: str) -> str:
     """
     Run a flow with a given profile and question, and extract the AI-generated message.
